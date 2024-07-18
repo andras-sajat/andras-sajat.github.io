@@ -1,1 +1,236 @@
-Showcase page
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Welcome to the Forge</title>
+    <script src="https://cdn.ethers.io/scripts/ethers-v3.min.js" charset="utf-8" type="text/javascript"></script>
+    <!-- Include Tailwind CSS -->
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
+    <h1 class="text-3xl font-bold mb-6 text-center">Welcome to the Forge</h1>
+    <div id="matic-balance" class="text-xl font-bold mb-4">MATIC Balance: 0</div>
+    <div id="tokens" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 w-full max-w-6xl">
+        <!-- Token Boxes will be dynamically added here -->
+    </div>
+
+    <script>
+        const abi = [
+            {
+                "constant": true,
+                "inputs": [{"name": "account", "type": "address"}],
+                "name": "balanceOfAll",
+                "outputs": [{"name": "", "type": "uint256[7]"}],
+                "payable": false,
+                "stateMutability": "view",
+                "type": "function"
+            },
+            {
+                "constant": false,
+                "inputs": [{"name": "tokenId", "type": "uint256"}],
+                "name": "mint",
+                "outputs": [],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "constant": false,
+                "inputs": [{"name": "id", "type": "uint256"}],
+                "name": "burnToken",
+                "outputs": [],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            },
+            {
+                "constant": false,
+                "inputs": [
+                    {"name": "id", "type": "uint256"},
+                    {"name": "to", "type": "uint256"}
+                ],
+                "name": "tradeToken",
+                "outputs": [],
+                "payable": false,
+                "stateMutability": "nonpayable",
+                "type": "function"
+            }
+        ];
+
+        const contractAddress = "0xc6d1C41B9f32A76D5FFe373c421bEE25335239AE";
+
+        async function initializeProvider() {
+            if (!window.ethereum) {
+                alert('MetaMask is required to use this application.');
+                throw new Error('MetaMask not found');
+            }
+
+            const provider = new ethers.providers.Web3Provider(window.ethereum);
+            await provider.send("eth_requestAccounts", []);
+            const signer = provider.getSigner();
+            const contract = new ethers.Contract(contractAddress, abi, signer);
+
+            return { provider, signer, contract };
+        }
+
+        async function getBalances(address) {
+            const { contract } = await initializeProvider();
+            return await contract.balanceOfAll(address);
+        }
+
+        async function getMaticBalance(address) {
+            const { provider } = await initializeProvider();
+            const balance = await provider.getBalance(address);
+            return ethers.utils.formatEther(balance);
+        }
+
+        async function mintToken(tokenId) {
+            const { contract } = await initializeProvider();
+            return await contract.mint(tokenId);
+        }
+
+        async function burnToken(tokenId) {
+            const { contract } = await initializeProvider();
+            return await contract.burnToken(tokenId);
+        }
+
+        async function tradeToken(tokenId, toTokenId) {
+            const { contract } = await initializeProvider();
+            return await contract.tradeToken(tokenId, toTokenId);
+        }
+
+        async function updateBalances() {
+            const address = await getCurrentAddress();
+            const balances = await getBalances(address);
+            const maticBalance = await getMaticBalance(address);
+            document.getElementById('matic-balance').innerText = `MATIC Balance: ${maticBalance}`;
+            const tokenDivs = document.querySelectorAll('.token-box');
+            balances.forEach((balance, i) => {
+                tokenDivs[i].querySelector('.balance').innerText = balance.toString();
+            });
+        }
+
+        async function getCurrentAddress() {
+            const { provider } = await initializeProvider();
+            const accounts = await provider.listAccounts();
+            return accounts[0];
+        }
+
+        async function handleMint(tokenId, button) {
+            try {
+                setLoading(button, true);
+                const tx = await mintToken(tokenId);
+                await tx.wait();
+                await updateBalances();
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(button, false);
+            }
+        }
+
+        async function handleBurn(tokenId, button) {
+            try {
+                setLoading(button, true);
+                const tx = await burnToken(tokenId);
+                await tx.wait();
+                await updateBalances();
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(button, false);
+            }
+        }
+
+        async function handleTrade(tokenId, button) {
+            const toTokenId = parseInt(prompt("Enter the token ID to trade to (0, 1, or 2):"));
+            if (isNaN(toTokenId) || toTokenId < 0 || toTokenId > 2) {
+                alert("Invalid token ID for trade. Please enter 0, 1, or 2.");
+                return;
+            }
+
+            try {
+                setLoading(button, true);
+                const tx = await tradeToken(tokenId, toTokenId);
+                await tx.wait();
+                await updateBalances();
+            } catch (error) {
+                console.error(error);
+            } finally {
+                setLoading(button, false);
+            }
+        }
+
+        function setLoading(button, isLoading) {
+            if (isLoading) {
+                button.disabled = true;
+                button.innerHTML = `
+                    <div class="loader"></div>
+                    Processing...
+                `;
+            } else {
+                button.disabled = false;
+                if (button.classList.contains('mint-button')) {
+                    button.innerHTML = 'Mint';
+                } else if (button.classList.contains('burn-button')) {
+                    button.innerHTML = 'Burn';
+                } else if (button.classList.contains('trade-button')) {
+                    button.innerHTML = 'Trade';
+                }
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            const tokensDiv = document.getElementById('tokens');
+
+            for (let i = 0; i <= 6; i++) {
+                const tokenBox = document.createElement('div');
+                tokenBox.className = 'token-box bg-white p-4 rounded-lg shadow-md flex flex-col justify-between items-center';
+                tokenBox.innerHTML = `
+                    <div class="balance-container">
+                        <h2 class="text-xl font-semibold mb-2">Token ${i}</h2>
+                        <p class="balance text-2xl font-bold">0</p>
+                    </div>
+                    <div class="buttons-container flex flex-col w-full">
+                        <button onclick="handleMint(${i}, this)" class="mint-button bg-blue-500 text-white rounded mb-2 px-4 py-2 hover:bg-blue-600 focus:outline-none focus:bg-blue-600">Mint</button>
+                        <button onclick="handleBurn(${i}, this)" class="burn-button bg-red-500 text-white rounded mb-2 px-4 py-2 hover:bg-red-600 focus:outline-none focus:bg-red-600">Burn</button>
+                        <button onclick="handleTrade(${i}, this)" class="trade-button bg-green-500 text-white rounded px-4 py-2 hover:bg-green-600 focus:outline-none focus:bg-green-600">Trade</button>
+                    </div>
+                `;
+                tokensDiv.appendChild(tokenBox);
+            }
+
+            await updateBalances();
+        });
+    </script>
+
+    <style>
+        .balance-container {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .buttons-container {
+            width: 100%;
+        }
+
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 16px;
+            height: 16px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+</body>
+</html>
