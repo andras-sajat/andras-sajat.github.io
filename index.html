@@ -113,6 +113,7 @@
         async function getCurrentAddress() {
             const { provider } = await initializeProvider();
             const accounts = await provider.listAccounts();
+            console.log(accounts[0]);
             return accounts[0];
         }
 
