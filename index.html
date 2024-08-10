@@ -60,9 +60,41 @@
         const contractAddress = "0xc6d1C41B9f32A76D5FFe373c421bEE25335239AE";
 
         async function initializeProvider() {
-            if (!window.ethereum) {
+            if (!window.ethereum && ethereum.isMetaMask) {
                 alert('MetaMask is required to use this application.');
                 throw new Error('MetaMask not found');
+            }
+
+            const chainId = await window.ethereum.request({ method: "eth_chainId" })
+            console.log(chainId);
+
+            if (chainId != '0x13882') {
+                try {
+                    console.log("switching to polygon amoy");
+                    await window.ethereum.request({
+                        method: 'wallet_switchEthereumChain',
+                        params: [{ chainId: '0x13882' }],
+                    });
+                } catch (switchError) {
+                    if (switchError.code === 4902) {
+                        try {
+                            console.log("polygon amoy has not been added to metamask yet, adding...");
+                            await window.ethereum
+                                .request({
+                                method: "wallet_addEthereumChain",
+                                params: [
+                                    {
+                                    chainId: "0x13882",
+                                    chainName: "Polygon Amoy Testnet",
+                                    rpcUrls: ["https://rpc-amoy.polygon.technology/"]
+                                    },
+                                ],
+                                })
+                        } catch (addError) {
+                            console.log("couldn't add and switch to polygon amoy")
+                        }
+                    }
+                }
             }
 
             const provider = new ethers.providers.Web3Provider(window.ethereum);
@@ -110,6 +142,16 @@
             });
         }
 
+        async function updateBalance(tokenId) {
+            const address = await getCurrentAddress();
+            const balance = await getBalances(address);
+            const maticBalance = await getMaticBalance(address);
+            document.getElementById('matic-balance').innerText = `MATIC Balance: ${maticBalance}`;
+            const tokenDivs = document.querySelectorAll('.token-box');
+
+            tokenDivs[tokenId].querySelector('.balance').innerText = balance.toString();
+        }
+
         async function getCurrentAddress() {
             const { provider } = await initializeProvider();
             const accounts = await provider.listAccounts();
@@ -122,7 +164,7 @@
                 setLoading(button, true);
                 const tx = await mintToken(tokenId);
                 await tx.wait();
-                await updateBalances();
+                location.reload();
             } catch (error) {
                 console.error(error);
             } finally {
@@ -135,7 +177,7 @@
                 setLoading(button, true);
                 const tx = await burnToken(tokenId);
                 await tx.wait();
-                await updateBalances();
+                location.reload();
             } catch (error) {
                 console.error(error);
             } finally {
@@ -154,7 +196,7 @@
                 setLoading(button, true);
                 const tx = await tradeToken(tokenId, toTokenId);
                 await tx.wait();
-                await updateBalances();
+                location.reload();
             } catch (error) {
                 console.error(error);
             } finally {
