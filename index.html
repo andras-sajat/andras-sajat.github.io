@@ -9,6 +9,13 @@
 </head>
 <body class="bg-gray-100 min-h-screen flex flex-col items-center p-6">
     <h1 class="text-3xl font-bold mb-6 text-center">Welcome to the Forge</h1>
+
+    <!-- Contract Address Input Field -->
+    <div class="mb-6 w-full max-w-md">
+        <label for="contractAddress" class="block text-lg font-medium text-gray-700 mb-2 text-center">Forge address:</label>
+        <input type="text" id="contractAddress" class="w-full p-2 border border-gray-300 rounded" value="0xc6d1C41B9f32A76D5FFe373c421bEE25335239AE">
+    </div>
+
     <div id="matic-balance" class="text-xl font-bold mb-4">MATIC Balance: 0</div>
     <div id="tokens" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-7 gap-4 w-full max-w-6xl">
         <!-- Token Boxes will be dynamically added here -->
@@ -57,15 +64,13 @@
             }
         ];
 
-        const contractAddress = "0xc6d1C41B9f32A76D5FFe373c421bEE25335239AE";
-
         async function initializeProvider() {
             if (!window.ethereum && ethereum.isMetaMask) {
                 alert('MetaMask is required to use this application.');
                 throw new Error('MetaMask not found');
             }
 
-            const chainId = await window.ethereum.request({ method: "eth_chainId" })
+            const chainId = await window.ethereum.request({ method: "eth_chainId" });
             console.log(chainId);
 
             if (chainId != '0x13882') {
@@ -79,19 +84,24 @@
                     if (switchError.code === 4902) {
                         try {
                             console.log("polygon amoy has not been added to metamask yet, adding...");
-                            await window.ethereum
-                                .request({
+                            tx = await window.ethereum.request({
                                 method: "wallet_addEthereumChain",
                                 params: [
                                     {
-                                    chainId: "0x13882",
-                                    chainName: "Polygon Amoy Testnet",
-                                    rpcUrls: ["https://rpc-amoy.polygon.technology/"]
-                                    },
-                                ],
-                                })
+                                        chainId: "0x13882",
+                                        chainName: "Amoy Testnet",
+                                        rpcUrls: ["https://rpc-amoy.polygon.technology/"],
+                                        nativeCurrency: {
+                                            name: "MATIC",
+                                            symbol: "MATIC",
+                                            decimals: 18
+                                        }
+                                    }
+                                ]
+                            });
+                            await tx;
                         } catch (addError) {
-                            console.log("couldn't add and switch to polygon amoy")
+                            throw new Error("couldn't add and switch to polygon amoy");
                         }
                     }
                 }
@@ -100,6 +110,7 @@
             const provider = new ethers.providers.Web3Provider(window.ethereum);
             await provider.send("eth_requestAccounts", []);
             const signer = provider.getSigner();
+            const contractAddress = document.getElementById('contractAddress').value;
             const contract = new ethers.Contract(contractAddress, abi, signer);
 
             return { provider, signer, contract };
